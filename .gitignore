@@ -1,0 +1,22 @@
+# datasets: VZCrash is gated and CC BY-NC which has not be shared..
+data/
+processed/
+VZCrash/
+*.parquet
+
+# generated at the repo root; committed copies live in models/ and firmware/
+/crash_model.keras
+/crash_model_vzcrash.keras
+/crash_model.tflite
+/scaler.npz
+/scaler_vzcrash.npz
+/model_data.h
+
+# python and notebooks
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+
+# secrets
+.env
