@@ -208,3 +208,4 @@ async def live(websocket: WebSocket, key: str = ""):
             await websocket.receive_text()
     except WebSocketDisconnect:
         hub.clients.discard(websocket)
+        
