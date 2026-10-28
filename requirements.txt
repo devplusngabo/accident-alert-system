@@ -1,0 +1,6 @@
+numpy
+pyarrow
+tensorflow
+scikit-learn
+pyserial
+huggingface_hub
