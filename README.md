@@ -1,8 +1,7 @@
-# accident-alert-system
+# crashAlert AI System
 
-Edge-AI crash detection on an Arduino Nano 33 BLE. A 3.4 KB neural network tells real crashes
-from bumps, door slams and hard braking, so an alert can be sent to emergency services
-without human intervention.
+crashAlert AI System is an accident/crash detection on an Arduino Nano 33 BLE. A 3.4 KB neural network tells real crashes
+from bumps, door slams and hard braking, so an alert can be sent to emergency services mainly the Police Department of Road Safety without human intervention.
 
 ## How it works
 Nano 33 BLE (IMU + model) -> BLE -> phone app (GPS, internet) -> police / emergency contacts
