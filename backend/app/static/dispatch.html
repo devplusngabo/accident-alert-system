@@ -1,0 +1,104 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Emergency dispatch (mock)</title>
+<style>
+:root{--bg:#0e1722;--s:#16222f;--line:#2a3c50;--tx:#e8eef4;--mu:#93a5b8;--ok:#2fbf71;--warn:#f2b33d;--s1:#f2b33d;--s2:#f07f2d;--s3:#e5484d;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:12px}.brand b{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.mock{font-size:13px;color:var(--warn);border:1px solid var(--warn);border-radius:6px;padding:1px 8px}
+.hdr{display:flex;align-items:center;gap:20px;color:var(--mu)}
+.live{display:flex;align-items:center;gap:8px}.live i{width:10px;height:10px;border-radius:50%;background:var(--ok)}.live.off i{background:var(--warn)}
+#clock{font-variant-numeric:tabular-nums;font-size:18px;color:var(--tx)}
+button{font:inherit;font-weight:700;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--tx);padding:8px 14px;cursor:pointer}
+button:focus-visible,.inc:focus-visible,a:focus-visible{outline:3px solid #7cc0ff;outline-offset:2px}
+main{flex:1;display:grid;grid-template-columns:380px 1fr;min-height:0}
+aside{border-right:1px solid var(--line);overflow:auto;padding:16px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stats div{background:var(--s);border-radius:12px;padding:12px 14px}
+.stats b{display:block;font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.stats small{color:var(--mu)}
+.inc{background:var(--s);border-radius:12px;padding:12px 14px 12px 16px;margin-bottom:10px;border-left:6px solid var(--mu);cursor:pointer}
+.inc.s1{border-color:var(--s1)}.inc.s2{border-color:var(--s2)}.inc.s3{border-color:var(--s3)}
+.inc.sel{outline:2px solid var(--tx)}
+.inc .top{display:flex;justify-content:space-between;color:var(--mu);font-size:14px}
+.inc .sev{font-weight:700}.s1 .sev{color:var(--s1)}.s2 .sev{color:var(--s2)}.s3 .sev{color:var(--s3)}
+.inc .meta{color:var(--mu);font-size:14px}
+.empty{color:var(--mu)}
+#detail{padding:28px;overflow:auto}
+#dsev{font-size:44px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.1}
+#dveh{color:var(--mu);font-size:20px;margin:4px 0 20px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.grid div{background:var(--s);border-radius:12px;padding:12px 14px}
+.grid small{display:block;color:var(--mu);font-size:13px}.grid b{font-size:22px;font-variant-numeric:tabular-nums}
+#map{width:100%;height:min(46vh,420px);border:0;border-radius:12px;background:var(--s)}
+#empty{display:grid;place-content:center;height:100%;text-align:center}
+#empty h2{font-size:28px;margin:0 0 6px}
+a.link{display:inline-block;margin-top:12px;color:var(--tx);font-weight:700}
+#banner{position:fixed;top:0;left:0;right:0;padding:16px 24px;background:var(--s3);color:#fff;font-size:24px;font-weight:800;transform:translateY(-100%);transition:transform .3s;z-index:5;cursor:pointer}
+#banner.show{transform:none}
+@media(max-width:820px){main{grid-template-columns:1fr;overflow:auto}aside{border-right:0;border-bottom:1px solid var(--line);overflow:visible}.grid{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){#banner{transition:none}}
+</style></head><body>
+<div id="banner" role="alert"></div>
+<header><div class="brand"><b>Emergency dispatch</b><span class="mock">Mock</span></div>
+<div class="hdr"><span id="live" class="live"><i></i><span id="lt">Live</span></span><span id="clock"></span><button id="snd">Enable sound</button></div></header>
+<main><aside><div class="stats"><div><b id="nA">0</b><small>Alerts</small></div><div><b id="nC">0</b><small>False alarms cancelled</small></div></div><div id="list"></div></aside>
+<section id="detail"><div id="empty"><div><h2>Standing by</h2><p class="empty">No incidents yet. A crash alert from a vehicle appears here the moment it is sent.</p></div></div>
+<div id="info" style="display:none"><h1 id="dsev"></h1><p id="dveh"></p>
+<div class="grid"><div><small>Peak impact</small><b id="mP"></b></div><div><small>Confidence</small><b id="mC"></b></div><div><small>Received</small><b id="mT"></b></div><div><small>Position accuracy</small><b id="mA"></b></div></div>
+<iframe id="map" title="Crash location map"></iframe><p id="noloc" class="empty">Location unavailable for this alert.</p>
+<a id="glink" class="link" target="_blank" rel="noopener">Open in Google Maps</a></div></section></main>
+<script>
+const $=id=>document.getElementById(id),SEV=['None','Minor','Serious','Critical'];
+const ALARM_MS=8000;
+let alerts=[],cancelled=0,lastId=null,sel=null,audio=null,mapFor=null,alarm=null,alarmEnd=null;
+function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+function ago(a){const s=(Date.now()-new Date(a.created_at_utc))/1000;return s<60?'just now':s<3600?Math.floor(s/60)+' min ago':Math.floor(s/3600)+' h ago'}
+function beep(){if(!audio)return;const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.4)}
+function startAlarm(){stopAlarm();beep();alarm=setInterval(beep,600);alarmEnd=setTimeout(stopAlarm,ALARM_MS)}
+function stopAlarm(){clearInterval(alarm);clearTimeout(alarmEnd);alarm=null;alarmEnd=null;$('banner').classList.remove('show')}
+$('banner').onclick=stopAlarm;
+$('snd').onclick=()=>{audio=new (window.AudioContext||window.webkitAudioContext)();beep();$('snd').textContent='Sound on'};
+setInterval(()=>{$('clock').textContent=new Date().toLocaleTimeString()},1000);
+function detail(){
+  const a=alerts.find(x=>x.id===sel);
+  $('empty').style.display=a?'none':'grid';$('info').style.display=a?'block':'none';
+  if(!a)return;
+  $('dsev').textContent=SEV[a.severity]+' crash'+((a.flags&2)?' (test)':'');$('dsev').style.color='var(--s'+a.severity+')';
+  $('dveh').textContent=a.vehicle_label;
+  $('mP').textContent=a.peak_g.toFixed(1)+' g';$('mC').textContent=Math.round(a.confidence*100)+'%';
+  $('mT').textContent=a.created_at_local;$('mA').textContent=a.accuracy_m!=null?Math.round(a.accuracy_m)+' m':'n/a';
+  const has=a.lat!=null;$('map').style.display=has?'block':'none';$('noloc').style.display=has?'none':'block';$('glink').style.display=has?'inline-block':'none';
+  if(has){
+    if(mapFor!==a.id){const d=.004;$('map').src='https://www.openstreetmap.org/export/embed.html?bbox='+[a.lng-d*1.6,a.lat-d,a.lng+d*1.6,a.lat+d].join(',')+'&layer=mapnik&marker='+a.lat+','+a.lng;mapFor=a.id}
+    $('glink').href='https://www.google.com/maps?q='+a.lat+','+a.lng;
+  }else mapFor=null;
+}
+function render(){
+  $('nA').textContent=alerts.length;$('nC').textContent=cancelled;
+  const list=$('list');list.textContent='';
+  if(!alerts.length)list.appendChild(el('p','empty','Alerts from vehicles appear here as they arrive.'));
+  for(const a of alerts){
+    const c=el('article','inc s'+a.severity+(a.id===sel?' sel':''));c.tabIndex=0;
+    const top=el('div','top');top.append(el('span','sev',SEV[a.severity]+((a.flags&2)?' (test)':'')),el('span',null,ago(a)));
+    c.append(top,el('b',null,a.vehicle_label),el('div','meta',a.peak_g.toFixed(1)+' g, '+Math.round(a.confidence*100)+'% confidence'));
+    c.onclick=()=>{stopAlarm();sel=a.id;render()};c.onkeydown=e=>{if(e.key==='Enter'){stopAlarm();sel=a.id;render()}};
+    list.appendChild(c);
+  }
+  detail();
+}
+async function poll(){
+  try{
+    const [a,ev]=await Promise.all([fetch('/api/alerts?limit=50').then(r=>r.json()),fetch('/api/events?limit=200').then(r=>r.json())]);
+    alerts=a;cancelled=ev.filter(e=>e.type==='cancelled').length;
+    const top=a.length?a[0].id:0;
+    if(lastId!==null&&top>lastId){
+      sel=top;const n=a[0],b=$('banner');b.textContent='New alert: '+SEV[n.severity].toLowerCase()+' crash, '+n.vehicle_label;
+      b.classList.add('show');startAlarm();
+    }
+    if(sel===null&&a.length)sel=a[0].id;
+    lastId=top;$('live').classList.remove('off');$('lt').textContent='Live';render();
+  }catch(e){$('live').classList.add('off');$('lt').textContent='Offline, retrying'}
+}
+setInterval(poll,2000);poll();
+</script></body></html>
