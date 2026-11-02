@@ -1,0 +1,139 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0e1722"><title>CrashAllert</title>
+<style>
+:root{--bg:#0e1722;--s:#16222f;--line:#2a3c50;--tx:#e8eef4;--mu:#93a5b8;--ok:#2fbf71;--warn:#f2b33d;--bad:#e5484d;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--c:#4a5b6d}
+body[data-state=connecting],body[data-state=warn]{--c:var(--warn)}
+body[data-state=armed]{--c:var(--ok)}
+body[data-state=alert]{--c:var(--bad)}
+main{max-width:440px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:20px;font-weight:800;letter-spacing:-.01em;margin:0}
+.chip{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mu)}
+.chip i{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.ring{width:232px;height:232px;margin:36px auto 16px;border-radius:50%;border:10px solid var(--c);display:grid;place-content:center;text-align:center;transition:border-color .3s}
+.ring b{font-size:36px;font-weight:800;letter-spacing:-.02em}
+body[data-state=armed] .ring{animation:br 3.2s ease-in-out infinite}
+@keyframes br{50%{box-shadow:0 0 0 16px rgba(47,191,113,.13)}}
+.sub{text-align:center;color:var(--mu);margin:0 auto 24px;max-width:300px}
+button{font:inherit;font-weight:700;width:100%;min-height:54px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--tx);margin-top:10px}
+button:focus-visible,summary:focus-visible{outline:3px solid #7cc0ff;outline-offset:2px}
+button.pri{background:var(--tx);color:var(--bg);border:0}
+button:disabled{opacity:.4}
+.rows{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}
+.rows div{background:var(--s);border-radius:14px;padding:12px 14px}
+.rows small{display:block;color:var(--mu);font-size:13px}
+.rows b{font-size:15px}
+details{background:var(--s);border-radius:14px;margin-top:10px;padding:0 14px}
+summary{padding:14px 0;font-weight:700;cursor:pointer}
+details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+label{display:block;color:var(--mu);font-size:14px;margin:10px 0 4px}
+input{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--tx)}
+#log{list-style:none;margin:0;padding:0 0 12px;font-size:14px;color:var(--mu);max-height:220px;overflow:auto}
+#log li{padding:4px 0}
+footer{color:var(--mu);font-size:13px;text-align:center;margin-top:24px}
+#ov{display:none;position:fixed;inset:0;z-index:9;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;background:var(--bad);color:#fff}
+#ov.sent{background:#17804a}
+#ov h2{font-size:32px;margin:0 0 8px;letter-spacing:-.01em}
+#ov p{max-width:320px;margin:0 0 20px;opacity:.92}
+.cd{position:relative;width:240px;height:240px;margin-bottom:24px}
+.cd svg{width:100%;height:100%;transform:rotate(-90deg)}
+.cd circle{fill:none;stroke-width:12}
+.cd .bg{stroke:rgba(255,255,255,.25)}
+#fg{stroke:#fff;stroke-dasharray:679;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+#cnt{position:absolute;inset:0;display:grid;place-content:center;font-size:84px;font-weight:800}
+#cancel{max-width:320px;background:#fff;color:#111;border:0;font-size:20px;min-height:64px}
+@media(prefers-reduced-motion:reduce){.ring,#fg{animation:none!important;transition:none!important}}
+</style></head>
+<body data-state="off"><main>
+<header><h1>CrashAllert</h1><div class="chip"><i></i><span id="chip">Not connected</span></div></header>
+<div class="ring"><div><b id="rt">Not connected</b></div></div>
+<p class="sub" id="rs"></p>
+<button id="conn" class="pri">Connect device</button>
+<div class="rows"><div><small>Last event</small><b id="last">None yet</b></div><div><small>Location</small><b id="gps">Waiting for GPS</b></div></div>
+<details><summary>Demo controls</summary>
+<label for="veh">Vehicle label</label><input id="veh" maxlength="40">
+<label for="cd">Cancel window in seconds (5 to 60)</label><input id="cd" type="number" min="5" max="60">
+<button id="sim">Simulate crash (no device)</button><button id="tc" disabled>Send test crash via device</button><button id="tb" disabled>Send test bump via device</button><div style="height:12px"></div></details>
+<details><summary>Activity</summary><ul id="log"></ul></details>
+<footer>Prototype. Not a certified safety device. Dispatch is a mock.</footer></main>
+<div id="ov"><h2 id="ovt"></h2><p id="ovs"></p><div class="cd"><svg viewBox="0 0 240 240"><circle class="bg" cx="120" cy="120" r="108"/><circle id="fg" cx="120" cy="120" r="108"/></svg><div id="cnt"></div></div><button id="cancel">I am OK, cancel</button></div>
+<script>
+const SVC='19b10010-e8f2-537e-4f6c-d104768a1214',EVT='19b10011-e8f2-537e-4f6c-d104768a1214',HB='19b10012-e8f2-537e-4f6c-d104768a1214',CMD='19b10013-e8f2-537e-4f6c-d104768a1214';
+const $=id=>document.getElementById(id),NAMES=['Normal','Non-crash impact','Knock or drop','Crash'],CIRC=679;
+const TITLE={off:'Not connected',connecting:'Connecting',armed:'Armed',warn:'No signal',alert:'Alert'};
+const SUB={off:'Connect your CrashAllert device to start monitoring.',connecting:'Looking for the device. Pick CrashAllert from the list.',armed:'Watching for impacts. If a crash is detected, an alert is sent automatically.',warn:'The device has stopped responding. Check that it is powered.',alert:'Crash detected.'};
+let device,cmd,fix=null,alerting=false,audio=null,lastHb=0,tries=0,lastIgn=0,connected=false,timer=null,beepT=null,gpsOn=false;
+$('veh').value=localStorage.getItem('veh')||'Demo vehicle';$('cd').value=localStorage.getItem('cd')||15;
+$('veh').onchange=()=>localStorage.setItem('veh',$('veh').value);$('cd').onchange=()=>localStorage.setItem('cd',$('cd').value);
+function badge(s,sub){document.body.dataset.state=s;$('rt').textContent=TITLE[s];$('chip').textContent=TITLE[s];$('rs').textContent=sub||SUB[s];$('conn').style.display=(s==='armed'||s==='alert')?'none':'block'}
+badge('off');
+function log(t){const li=document.createElement('li');li.textContent=new Date().toLocaleTimeString()+' '+t;$('log').prepend(li);while($('log').children.length>50)$('log').lastChild.remove()}
+function beep(){if(!audio)return;const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=880;g.gain.value=0.4;o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+0.3)}
+async function wake(){try{await navigator.wakeLock.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&connected)wake()});
+function start(){
+  audio=audio||new (window.AudioContext||window.webkitAudioContext)();wake();
+  if(navigator.geolocation&&!gpsOn){gpsOn=true;navigator.geolocation.watchPosition(p=>{fix={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy,ts:p.timestamp};
+    $('gps').textContent='Accuracy '+Math.round(p.coords.accuracy)+' m'},e=>{$('gps').textContent='Unavailable'},{enableHighAccuracy:true,maximumAge:5000})}
+}
+function en(on){$('tc').disabled=!on;$('tb').disabled=!on}
+async function attach(){
+  const server=await device.gatt.connect(),svc=await server.getPrimaryService(SVC);
+  const evt=await svc.getCharacteristic(EVT),hb=await svc.getCharacteristic(HB);cmd=await svc.getCharacteristic(CMD);
+  evt.addEventListener('characteristicvaluechanged',e=>onEvent(parse(e.target.value)));
+  hb.addEventListener('characteristicvaluechanged',()=>{lastHb=Date.now()});
+  await evt.startNotifications();await hb.startNotifications();
+  lastHb=Date.now();tries=0;connected=true;en(true);if(!alerting)badge('armed');log('Connected');
+}
+function retry(){connected=false;en(false);
+  if(tries>=10){badge('off','Could not reconnect. Tap Reconnect.');$('conn').textContent='Reconnect';return}
+  badge('off','Connection lost. Reconnecting...');tries++;setTimeout(async()=>{try{await attach()}catch(e){retry()}},3000)}
+$('conn').onclick=async()=>{
+  if(!navigator.bluetooth){badge('off','This browser has no Bluetooth support. Open the page in Chrome on Android.');return}
+  start();tries=0;badge('connecting');
+  try{if(!device||$('conn').textContent==='Connect device'){device=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});device.addEventListener('gattserverdisconnected',retry)}
+    await attach();$('conn').textContent='Connect device';
+  }catch(e){badge('off','Could not connect: '+e.message);log('Connect failed: '+e.message)}
+};
+setInterval(()=>{if(connected&&!alerting)badge(Date.now()-lastHb>5000?'warn':'armed')},1000);
+function parse(d){return d.byteLength<14?null:{cls:d.getUint8(1),sev:d.getUint8(2),flags:d.getUint8(3),peak:d.getUint16(4,true)/100,
+  conf:d.getUint16(6,true)/1000,ms:d.getUint32(8,true),seq:d.getUint16(12,true)}}
+function body(e){return {class:e.cls,severity:e.sev,peak_g:e.peak,confidence:e.conf,flags:e.flags,device_ms:e.ms,seq:e.seq}}
+function post(url,obj){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)})}
+function onEvent(e){
+  if(!e||e.cls===0)return;
+  $('last').textContent=NAMES[e.cls]+', '+e.peak.toFixed(1)+' g';
+  log(NAMES[e.cls]+' '+e.peak.toFixed(1)+' g'+(e.cls===3?' (alert)':' (ignored)'));
+  if(e.cls===3){alertFlow(e);return}
+  if(Date.now()-lastIgn>5000){lastIgn=Date.now();post('/api/events',{type:'ignored_event',vehicle_label:$('veh').value||'Demo vehicle',event:body(e),client_time_iso:new Date().toISOString()}).catch(()=>{})}
+}
+function setRing(n,total){$('fg').style.strokeDashoffset=CIRC*(1-n/total)}
+function endAlert(){clearInterval(timer);clearInterval(beepT);alerting=false;$('ov').style.display='none';$('ov').className='';badge(connected?'armed':'off')}
+function alertFlow(e){
+  if(alerting)return;alerting=true;badge('alert');
+  let n=Math.min(60,Math.max(5,parseInt($('cd').value)||15)),total=n;
+  const fg=$('fg');fg.style.transition='none';fg.style.strokeDashoffset=0;void fg.getBoundingClientRect();fg.style.transition='';
+  $('ov').className='';$('ov').style.display='flex';$('ovt').textContent='Crash detected';
+  $('ovs').textContent='An alert with your location will be sent automatically. Tap cancel if you are safe.';
+  $('cancel').style.display='block';$('cancel').textContent='I am OK, cancel';$('cnt').textContent=n;
+  beepT=setInterval(beep,600);if(navigator.vibrate)navigator.vibrate([400,200,400]);
+  $('cancel').onclick=()=>{endAlert();log('Cancelled by user');post('/api/events',{type:'cancelled',vehicle_label:$('veh').value||'Demo vehicle',event:body(e),client_time_iso:new Date().toISOString()}).catch(()=>{})};
+  timer=setInterval(()=>{n--;$('cnt').textContent=n;setRing(n,total);if(n<=0){clearInterval(timer);clearInterval(beepT);send(e,total)}},1000);
+}
+async function send(e,total){
+  $('cancel').style.display='none';$('ovt').textContent='Sending alert';$('ovs').textContent='Contacting dispatch...';
+  const age=fix?(Date.now()-fix.ts)/1000:null,useFix=fix&&age<=60;
+  const payload={vehicle_label:$('veh').value||'Demo vehicle',event:body(e),countdown_s:total,client_time_iso:new Date().toISOString(),
+    location:useFix?{lat:fix.lat,lng:fix.lng,accuracy_m:fix.acc,fix_age_s:age}:null};
+  for(let i=1;i<=6;i++){
+    try{const r=await post('/api/alerts',payload);if(r.ok){$('ov').className='sent';$('ovt').textContent='Alert sent';$('ovs').textContent='Dispatch was notified at '+new Date().toLocaleTimeString()+'.';
+      $('cnt').textContent='\u2713';$('fg').style.strokeDashoffset=0;log('Alert sent');setTimeout(endAlert,10000);return}}catch(err){}
+    $('ovs').textContent='Attempt '+i+' failed. Retrying in 5 seconds...';await new Promise(r=>setTimeout(r,5000));
+  }
+  $('ovt').textContent='Alert not sent';$('ovs').textContent='Could not reach the server. Check the connection.';
+  $('cancel').style.display='block';$('cancel').textContent='Close';$('cancel').onclick=()=>endAlert();
+}
+$('sim').onclick=()=>{start();alertFlow({cls:3,sev:2,flags:2,peak:9.4,conf:1,ms:0,seq:0})};
+$('tc').onclick=()=>cmd&&cmd.writeValue(Uint8Array.of(1));$('tb').onclick=()=>cmd&&cmd.writeValue(Uint8Array.of(2));
+</script></body></html>
