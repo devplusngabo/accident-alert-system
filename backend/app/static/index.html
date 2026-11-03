@@ -1,53 +1,69 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0e1722"><title>CrashAllert</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a0f18"><title>CrashAlert</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
 <style>
-:root{--bg:#0e1722;--s:#16222f;--line:#2a3c50;--tx:#e8eef4;--mu:#93a5b8;--ok:#2fbf71;--warn:#f2b33d;--bad:#e5484d;color-scheme:dark}
+:root{--bg:#0a0f18;--s:#121a27;--line:rgba(255,255,255,.09);--tx:#f2f5f9;--mu:#8b98a9;color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;min-height:100dvh;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--c:#4a5b6d}
-body[data-state=connecting],body[data-state=warn]{--c:var(--warn)}
-body[data-state=armed]{--c:var(--ok)}
-body[data-state=alert]{--c:var(--bad)}
-main{max-width:440px;margin:0 auto;padding:16px 16px 40px}
+body{margin:0;min-height:100dvh;color:var(--tx);font:16px/1.5 Manrope,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--c:#5b6b80;background:radial-gradient(120% 55% at 50% 0,color-mix(in srgb,var(--c) 22%,transparent),transparent 70%),var(--bg) no-repeat}
+body[data-state=connecting],body[data-state=warn]{--c:#ffb84d}
+body[data-state=armed]{--c:#3ddc97}
+body[data-state=alert]{--c:#ff4d5e}
+main{max-width:440px;margin:0 auto;padding:18px 18px 40px}
 header{display:flex;justify-content:space-between;align-items:center}
-h1{font-size:20px;font-weight:800;letter-spacing:-.01em;margin:0}
-.chip{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mu)}
-.chip i{width:10px;height:10px;border-radius:50%;background:var(--c)}
-.ring{width:232px;height:232px;margin:36px auto 16px;border-radius:50%;border:10px solid var(--c);display:grid;place-content:center;text-align:center;transition:border-color .3s}
-.ring b{font-size:36px;font-weight:800;letter-spacing:-.02em}
-body[data-state=armed] .ring{animation:br 3.2s ease-in-out infinite}
-@keyframes br{50%{box-shadow:0 0 0 16px rgba(47,191,113,.13)}}
-.sub{text-align:center;color:var(--mu);margin:0 auto 24px;max-width:300px}
-button{font:inherit;font-weight:700;width:100%;min-height:54px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--tx);margin-top:10px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.01em}
+.logo svg{width:30px;height:30px;padding:6px;border-radius:9px;background:var(--tx);stroke:var(--bg);fill:none;stroke-width:2.2;stroke-linejoin:round}
+.chip{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:99px;padding:6px 12px}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+.orb{position:relative;width:200px;height:200px;margin:44px auto 30px;display:grid;place-content:center}
+.orb::before,.orb::after{content:"";position:absolute;border-radius:50%;border:1.5px solid var(--c);inset:0;opacity:.4}
+.orb::after{inset:-28px;opacity:.16}
+.pl{position:absolute;inset:34px;border-radius:50%;border:1.5px solid var(--c);opacity:0}
+body[data-state=armed] .pl{animation:pulse 3.2s ease-out infinite}
+body[data-state=alert] .pl{animation:pulse 1s ease-out infinite}
+@keyframes pulse{from{transform:scale(1);opacity:.6}to{transform:scale(2);opacity:0}}
+.core{position:relative;width:132px;height:132px;border-radius:50%;display:grid;place-content:center;background:color-mix(in srgb,var(--c) 14%,var(--s));border:1.5px solid var(--c);box-shadow:0 0 70px color-mix(in srgb,var(--c) 40%,transparent);transition:border-color .3s,box-shadow .3s}
+.core svg{width:60px;height:60px;fill:none;stroke:var(--c);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.chk,.ex{display:none}
+body[data-state=armed] .chk{display:block}
+body[data-state=warn] .ex,body[data-state=alert] .ex{display:block}
+h2{font-size:34px;line-height:1.1;font-weight:800;letter-spacing:-.025em;text-align:center;margin:0 0 8px}
+.sub{text-align:center;color:var(--mu);margin:0 auto 28px;max-width:300px}
+button{font:inherit;font-weight:700;width:100%;min-height:56px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--tx);margin-top:10px;cursor:pointer}
 button:focus-visible,summary:focus-visible{outline:3px solid #7cc0ff;outline-offset:2px}
 button.pri{background:var(--tx);color:var(--bg);border:0}
 button:disabled{opacity:.4}
-.rows{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}
-.rows div{background:var(--s);border-radius:14px;padding:12px 14px}
-.rows small{display:block;color:var(--mu);font-size:13px}
-.rows b{font-size:15px}
-details{background:var(--s);border-radius:14px;margin-top:10px;padding:0 14px}
-summary{padding:14px 0;font-weight:700;cursor:pointer}
+.rows{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0}
+.rows div{background:var(--s);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.rows small{display:block;color:var(--mu);font-size:13px;font-weight:500}
+.rows b{font-size:15px;font-weight:700}
+details{background:var(--s);border:1px solid var(--line);border-radius:18px;margin-top:10px;padding:0 16px}
+summary{padding:15px 0;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"";width:8px;height:8px;margin-top:6px;border:solid var(--mu);border-width:0 2px 2px 0;transform:rotate(45deg);transition:transform .2s}
+details[open] summary::after{transform:rotate(-135deg);margin-top:10px}
 details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
 label{display:block;color:var(--mu);font-size:14px;margin:10px 0 4px}
-input{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--tx)}
+input{width:100%;font:inherit;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--tx)}
 #log{list-style:none;margin:0;padding:0 0 12px;font-size:14px;color:var(--mu);max-height:220px;overflow:auto}
 #log li{padding:4px 0}
-footer{color:var(--mu);font-size:13px;text-align:center;margin-top:24px}
-#ov{display:none;position:fixed;inset:0;z-index:9;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;background:var(--bad);color:#fff}
-#ov.sent{background:#17804a}
-#ov h2{font-size:32px;margin:0 0 8px;letter-spacing:-.01em}
-#ov p{max-width:320px;margin:0 0 20px;opacity:.92}
-.cd{position:relative;width:240px;height:240px;margin-bottom:24px}
+footer{color:var(--mu);font-size:13px;text-align:center;margin-top:28px}
+#ov{display:none;position:fixed;inset:0;z-index:9;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;background:radial-gradient(circle at 50% 30%,#ff5a67,#a81c2b 75%);color:#fff}
+#ov.sent{background:radial-gradient(circle at 50% 30%,#35d08b,#0c6b44 75%)}
+#ov h2{font-size:40px;color:#fff}
+#ov p{max-width:320px;margin:0 0 22px;opacity:.92}
+.cd{position:relative;width:240px;height:240px;margin-bottom:28px}
 .cd svg{width:100%;height:100%;transform:rotate(-90deg)}
-.cd circle{fill:none;stroke-width:12}
-.cd .bg{stroke:rgba(255,255,255,.25)}
+.cd circle{fill:none;stroke-width:8}
+.cd .bg{stroke:rgba(255,255,255,.22)}
 #fg{stroke:#fff;stroke-dasharray:679;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
-#cnt{position:absolute;inset:0;display:grid;place-content:center;font-size:84px;font-weight:800}
-#cancel{max-width:320px;background:#fff;color:#111;border:0;font-size:20px;min-height:64px}
-@media(prefers-reduced-motion:reduce){.ring,#fg{animation:none!important;transition:none!important}}
+#cnt{position:absolute;inset:0;display:grid;place-content:center;font-size:88px;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+#cancel{max-width:320px;background:#fff;color:#14181d;border:0;font-size:18px;min-height:62px}
+@media(prefers-reduced-motion:reduce){.pl,#fg{animation:none!important;transition:none!important}}
 </style></head>
 <body data-state="off"><main>
-<header><h1>CrashAllert</h1><div class="chip"><i></i><span id="chip">Not connected</span></div></header>
-<div class="ring"><div><b id="rt">Not connected</b></div></div>
+<header><div class="logo"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/></svg>CrashAlert</div><div class="chip"><i></i><span id="chip">Not connected</span></div></header>
+<div class="orb"><i class="pl"></i><div class="core"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/><path class="chk" d="m9 12 2 2 4-4"/><path class="ex" d="M12 8.5v4M12 15.5v.01"/></svg></div></div>
+<h2 id="rt">Not connected</h2>
 <p class="sub" id="rs"></p>
 <button id="conn" class="pri">Connect device</button>
 <div class="rows"><div><small>Last event</small><b id="last">None yet</b></div><div><small>Location</small><b id="gps">Waiting for GPS</b></div></div>
@@ -62,7 +78,7 @@ footer{color:var(--mu);font-size:13px;text-align:center;margin-top:24px}
 const SVC='19b10010-e8f2-537e-4f6c-d104768a1214',EVT='19b10011-e8f2-537e-4f6c-d104768a1214',HB='19b10012-e8f2-537e-4f6c-d104768a1214',CMD='19b10013-e8f2-537e-4f6c-d104768a1214';
 const $=id=>document.getElementById(id),NAMES=['Normal','Non-crash impact','Knock or drop','Crash'],CIRC=679;
 const TITLE={off:'Not connected',connecting:'Connecting',armed:'Armed',warn:'No signal',alert:'Alert'};
-const SUB={off:'Connect your CrashAllert device to start monitoring.',connecting:'Looking for the device. Pick CrashAllert from the list.',armed:'Watching for impacts. If a crash is detected, an alert is sent automatically.',warn:'The device has stopped responding. Check that it is powered.',alert:'Crash detected.'};
+const SUB={off:'Connect your CrashAlert device to start monitoring.',connecting:'Looking for the device. Pick CrashAlert from the list.',armed:'Watching for impacts. If a crash is detected, an alert is sent automatically.',warn:'The device has stopped responding. Check that it is powered.',alert:'Crash detected.'};
 let device,cmd,fix=null,alerting=false,audio=null,lastHb=0,tries=0,lastIgn=0,connected=false,timer=null,beepT=null,gpsOn=false;
 $('veh').value=localStorage.getItem('veh')||'Demo vehicle';$('cd').value=localStorage.getItem('cd')||15;
 $('veh').onchange=()=>localStorage.setItem('veh',$('veh').value);$('cd').onchange=()=>localStorage.setItem('cd',$('cd').value);
