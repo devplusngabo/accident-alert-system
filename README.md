@@ -214,6 +214,50 @@ python scripts/export_model.py      # write model_data.h for the firmware
 > [!NOTE]
 > The live phone flow currently uses the simpler **threshold firmware** (`firmware/crashguard_firmware`). Connecting the AI firmware to the phone app is on the [roadmap](#-roadmap).
 
+### 📈 Results
+
+**VZCrash test set** (24,174 events, real crashes)
+
+| Model | Recall | Precision | False alarms | AP |
+|---|---:|---:|---:|---:|
+| g-force threshold (baseline) | 89.7% | 77.3% | 5.6% | 0.872 |
+| Neural network, VZCrash only | 89.5% | **82.1%** | **4.1%** | **0.923** |
+| Neural network, retrained with own data | 89.9% | – | 4.3% | – |
+
+At the same recall (about 90%), the network raises precision from 77.3% to 82.1% and cuts false alarms from 5.6% to 4.1% compared with a plain g-force threshold. Retraining with our own recordings kept real-crash performance the same (the 0.2-point change is within run-to-run variation).
+
+**Our own held-out recordings** (107 events: 46 crash proxies, 61 everyday actions)
+
+| Model | Recall | False alarms |
+|---|---:|---:|
+| Neural network, retrained | 93.5% (43 / 46) | 3.3% (2 / 61) |
+| Threshold 2.44 g (tuned on VZCrash) | 100% | 42.6% |
+| Threshold 5.13 g (tuned on own data) | 87.0% | 0.0% |
+
+<details>
+<summary><b>Per action, and what retraining changed</b></summary>
+
+| Action | Flagged as crash |
+|---|---:|
+| Drop (crash proxy) | 19 / 20 |
+| Cart impact (crash proxy) | 15 / 17 |
+| Tumble (crash proxy) | 9 / 9 |
+| Door slam | 1 / 20 |
+| Hard brake | 1 / 11 |
+| Bump | 0 / 10 |
+| Handling | 0 / 20 |
+
+- **Tumbles:** live on the board, the VZCrash-only model missed them; the retrained model catches 9 of 9 held-out tumbles.
+- **Drops:** live, the old model caught 3 of 4 drops with thin margins; the retrained model catches 19 of 20 held-out drops.
+- **Threshold:** moved from 0.596 to about 0.574, tuned to 90% recall on VZCrash validation.
+
+The "before" figures come from a few live events, not a formal test.
+
+</details>
+
+> [!IMPORTANT]
+> **Limits of these results.** On our own data, a 5.13 g threshold ties the network, because our crash proxies peak at 6.6 g or more and everyday actions mostly stay under 5 g, so this test cannot separate the two methods. The held-out files come from the same day, box and surfaces as the training files. False alarms are per event, not per hour (the field test so far lasted 0.8 minutes). The old model was never measured on the held-out recordings, so there is no true before-and-after yet.
+
 <br>
 
 ## 🚀 Quick start
@@ -349,6 +393,7 @@ accident-alert-system/
 - [ ] Instant push to the portal (Server-Sent Events) instead of polling
 - [ ] Connect the on-device AI model to the phone flow
 - [ ] Always-on cloud deployment
+- [x] Accuracy evaluation on VZCrash and our own recordings
 - [ ] Field tests in real vehicles
 - [ ] Native mobile app that keeps working in the background
 
