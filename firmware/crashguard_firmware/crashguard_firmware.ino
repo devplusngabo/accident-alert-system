@@ -1,4 +1,4 @@
-// CrashAllert Phase A firmware: threshold detector + BLE protocol (see build spec section 3)
+// AccidentAlert AI System, Phase A firmware: threshold detector + BLE protocol (see build spec section 3)
 #include <ArduinoBLE.h>
 #define IMU_REV 1   // 1 = LSM9DS1 (Nano 33 BLE Rev1), 2 = BMI270 (Rev2). Set this to match your board.
 #if IMU_REV == 1
@@ -51,7 +51,7 @@ void setup() {
   if (Wire1.endTransmission() == 0) { accScale = 4.0; fullScaleG = 16.0; }
 #endif
   Serial.print("Accel range +-"); Serial.print(fullScaleG); Serial.println(" g");
-  BLE.setLocalName("CrashAllert"); BLE.setAdvertisedService(svc);
+  BLE.setLocalName("AccidentAlert");  // name may be sent in the scan response (advert space is full); the phone filters by service UUID BLE.setAdvertisedService(svc);
   svc.addCharacteristic(evtChar); svc.addCharacteristic(hbChar); svc.addCharacteristic(cmdChar);
   BLE.addService(svc); BLE.setEventHandler(BLEDisconnected, onDisconnect);
   hbChar.writeValue((uint32_t)0); BLE.advertise();
