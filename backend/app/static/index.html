@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a0f18"><title>CrashAlert</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a0f18"><title>AccidentAlert AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
 <style>
@@ -61,7 +61,7 @@ footer{color:var(--mu);font-size:13px;text-align:center;margin-top:28px}
 @media(prefers-reduced-motion:reduce){.pl,#fg{animation:none!important;transition:none!important}}
 </style></head>
 <body data-state="off"><main>
-<header><div class="logo"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/></svg>CrashAlert</div><div class="chip"><i></i><span id="chip">Not connected</span></div></header>
+<header><div class="logo"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/></svg>AccidentAlert AI</div><div class="chip"><i></i><span id="chip">Not connected</span></div></header>
 <div class="orb"><i class="pl"></i><div class="core"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/><path class="chk" d="m9 12 2 2 4-4"/><path class="ex" d="M12 8.5v4M12 15.5v.01"/></svg></div></div>
 <h2 id="rt">Not connected</h2>
 <p class="sub" id="rs"></p>
@@ -78,7 +78,7 @@ footer{color:var(--mu);font-size:13px;text-align:center;margin-top:28px}
 const SVC='19b10010-e8f2-537e-4f6c-d104768a1214',EVT='19b10011-e8f2-537e-4f6c-d104768a1214',HB='19b10012-e8f2-537e-4f6c-d104768a1214',CMD='19b10013-e8f2-537e-4f6c-d104768a1214';
 const $=id=>document.getElementById(id),NAMES=['Normal','Non-crash impact','Knock or drop','Crash'],CIRC=679;
 const TITLE={off:'Not connected',connecting:'Connecting',armed:'Armed',warn:'No signal',alert:'Alert'};
-const SUB={off:'Connect your CrashAlert device to start monitoring.',connecting:'Looking for the device. Pick CrashAlert from the list.',armed:'Watching for impacts. If a crash is detected, an alert is sent automatically.',warn:'The device has stopped responding. Check that it is powered.',alert:'Crash detected.'};
+const SUB={off:'Connect your AccidentAlert device to start monitoring.',connecting:'Looking for the device. Pick AccidentAlert from the list.',armed:'Watching for impacts. If a crash is detected, an alert is sent automatically.',warn:'The device has stopped responding. Check that it is powered.',alert:'Crash detected.'};
 let device,cmd,fix=null,alerting=false,audio=null,lastHb=0,tries=0,lastIgn=0,connected=false,timer=null,beepT=null,gpsOn=false;
 $('veh').value=localStorage.getItem('veh')||'Demo vehicle';$('cd').value=localStorage.getItem('cd')||15;
 $('veh').onchange=()=>localStorage.setItem('veh',$('veh').value);$('cd').onchange=()=>localStorage.setItem('cd',$('cd').value);
