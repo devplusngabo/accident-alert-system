@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="AccidentAlert AI System: detect the crash, alert responders, save the golden hour">
+  <defs>
+    <radialGradient id="glow" cx="18%" cy="45%" r="55%">
+      <stop offset="0" stop-color="#c23a24" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#0d0d0d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e8763f"/><stop offset="1" stop-color="#c23a24"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" x2="1">
+      <stop offset="0" stop-color="#e8763f" stop-opacity="0"/><stop offset=".15" stop-color="#e8763f"/>
+      <stop offset=".85" stop-color="#e8763f"/><stop offset="1" stop-color="#e8763f" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity=".035"/>
+    </pattern>
+  </defs>
+  <style>
+    .ring { fill: none; stroke: #e8763f; stroke-width: 2; transform-origin: 230px 165px; animation: pulse 3s ease-out infinite; opacity: 0; }
+    .r2 { animation-delay: 1s; } .r3 { animation-delay: 2s; }
+    @keyframes pulse { 0% { transform: scale(.55); opacity: .7; } 100% { transform: scale(1.5); opacity: 0; } }
+    .shield { transform-origin: 230px 165px; animation: beat 3s ease-in-out infinite; }
+    @keyframes beat { 0%, 100% { transform: scale(1); } 8% { transform: scale(1.06); } 16% { transform: scale(1); } }
+    .wave { fill: none; stroke: url(#fade); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round;
+            stroke-dasharray: 1400; stroke-dashoffset: 1400; animation: draw 4s linear infinite; }
+    @keyframes draw { 0% { stroke-dashoffset: 1400; } 70% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+    .t { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .fade-in { opacity: 0; animation: in .9s ease-out forwards; }
+    .d1 { animation-delay: .15s; } .d2 { animation-delay: .45s; } .d3 { animation-delay: .75s; }
+    @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .blink { animation: blink 1.2s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: .25; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; } }
+  </style>
+
+  <rect width="1280" height="360" rx="24" fill="#0d0d0d"/>
+  <rect width="1280" height="360" rx="24" fill="url(#grid)"/>
+  <rect width="1280" height="360" rx="24" fill="url(#glow)"/>
+
+  <!-- pulsing alert -->
+  <circle class="ring" cx="230" cy="165" r="90"/>
+  <circle class="ring r2" cx="230" cy="165" r="90"/>
+  <circle class="ring r3" cx="230" cy="165" r="90"/>
+  <g class="shield">
+    <rect x="170" y="105" width="120" height="120" rx="30" fill="url(#logo)"/>
+    <g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" transform="translate(194 129) scale(3)">
+      <path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z" stroke-width="2"/>
+      <path d="M12 8.5v4M12 15.5v.01" stroke-width="2"/>
+    </g>
+  </g>
+
+  <!-- text -->
+  <g class="t">
+    <text class="fade-in d1" x="380" y="128" fill="#898781" font-size="16" font-weight="700" letter-spacing="3">IoT  ·  EDGE AI  ·  EMERGENCY RESPONSE</text>
+    <text class="fade-in d2" x="378" y="190" fill="#f0efec" font-size="60" font-weight="800" letter-spacing="-1.5">AccidentAlert <tspan fill="#e8763f">AI</tspan> System</text>
+    <text class="fade-in d3" x="380" y="236" fill="#c3c2b7" font-size="22">Detect the crash. Alert responders. Save the golden hour.</text>
+  </g>
+
+  <!-- live acceleration trace with an impact spike -->
+  <path class="wave" d="M40 318 L180 318 L200 313 L215 322 L230 315 L250 318 L420 318 L432 311 L444 324 L456 318
+    L600 318 L612 306 L624 328 L636 314 L648 318 L700 318 L708 272 L716 346 L724 288 L732 338 L740 304 L748 326 L758 312 L770 320
+    L800 318 L1240 318"/>
+  <g class="t">
+    <circle class="blink" cx="1180" cy="40" r="5" fill="#d03b3b"/>
+    <text x="1170" y="45" fill="#c3c2b7" font-size="13" font-weight="700" text-anchor="end" letter-spacing="1.5">LIVE</text>
+    <text x="722" y="290" fill="#e8763f" font-size="13" font-weight="700" text-anchor="start" dx="40">IMPACT 12.6 g</text>
+  </g>
+</svg>
