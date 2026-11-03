@@ -1,174 +1,163 @@
-import os
-import sqlite3
-import time
-import uuid
-from contextlib import closing
-from typing import Optional
+import os, sqlite3, time
+from collections import defaultdict, deque
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Literal, Optional
+from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
-from fastapi.security import APIKeyHeader
-from pydantic import BaseModel, Field
+import httpx
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, ConfigDict, Field
 
-DB_PATH = os.getenv("DB_PATH", "alerts.db")
-API_KEY = os.getenv("API_KEY", "")  # empty means no key check, for local testing only
-CANCEL_SECONDS = int(os.getenv("CANCEL_SECONDS", "15"))
-ONLINE_SECONDS = int(os.getenv("ONLINE_SECONDS", "60"))
+# ---- Config (environment variables) ----
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT = os.getenv("TELEGRAM_CHAT_ID")
+DB_PATH = os.getenv("DB_PATH", "./crashguard.db")
+TZ = ZoneInfo(os.getenv("TIMEZONE_DISPLAY", "Africa/Kigali"))
+RATE = int(os.getenv("ALERT_RATE_LIMIT_PER_MIN", "10"))
+STATIC = Path(__file__).parent / "static"
+SEV = {0: "none", 1: "minor", 2: "serious", 3: "critical"}
 
-app = FastAPI(title="Accident Alert System API", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# ---- Database ----
+def q(sql, args=(), write=False):
+    c = sqlite3.connect(DB_PATH)
+    c.row_factory = sqlite3.Row
+    try:
+        cur = c.execute(sql, args)
+        if write:
+            c.commit()
+            return cur.lastrowid
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        c.close()
 
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+q("""CREATE TABLE IF NOT EXISTS alerts(id INTEGER PRIMARY KEY AUTOINCREMENT, created_at_utc TEXT,
+ vehicle_label TEXT, event_class INTEGER, severity INTEGER, peak_g REAL, confidence REAL, flags INTEGER,
+ device_ms INTEGER, seq INTEGER, lat REAL, lng REAL, accuracy_m REAL, fix_age_s REAL,
+ client_time_iso TEXT, countdown_s INTEGER, telegram_status TEXT, status TEXT)""", write=True)
+q("""CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, created_at_utc TEXT,
+ type TEXT, vehicle_label TEXT, event_class INTEGER, severity INTEGER, peak_g REAL, flags INTEGER,
+ client_time_iso TEXT)""", write=True)
 
+# ---- Request models ----
+class Event(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    cls: int = Field(alias="class", ge=0, le=3)
+    severity: int = Field(ge=0, le=3)
+    peak_g: float = Field(ge=0)
+    confidence: float = Field(ge=0, le=1)
+    flags: int = Field(ge=0, le=255)
+    device_ms: int = Field(ge=0)
+    seq: int = Field(ge=0)
 
-def require_key(key: Optional[str] = Depends(api_key_header)):
-    if API_KEY and key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-
-def connect():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-with closing(connect()) as conn, conn:
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS alerts (
-            id TEXT PRIMARY KEY, device_id TEXT, probability REAL, latitude REAL,
-            longitude REAL, occurred_at REAL, created_at REAL, status TEXT);
-        CREATE TABLE IF NOT EXISTS devices (
-            device_id TEXT PRIMARY KEY, last_seen REAL, connected INTEGER, rssi INTEGER,
-            alert_count INTEGER, last_probability REAL);
-    """)
-
+class Location(BaseModel):
+    lat: float
+    lng: float
+    accuracy_m: Optional[float] = None
+    fix_age_s: Optional[float] = None
 
 class AlertIn(BaseModel):
-    device_id: str
-    probability: float = Field(ge=0, le=1)
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    occurred_at: Optional[float] = None  # unix seconds, measured on the phone
+    vehicle_label: str = Field(min_length=1, max_length=40)
+    event: Event
+    location: Optional[Location] = None
+    client_time_iso: str
+    countdown_s: int = Field(ge=0, le=120)
 
+class EventLogIn(BaseModel):
+    type: Literal["cancelled", "ignored_event"]
+    vehicle_label: str = Field(min_length=1, max_length=40)
+    event: Event
+    client_time_iso: str
 
-class HeartbeatIn(BaseModel):
-    connected: bool = True
-    rssi: Optional[int] = None
-    alert_count: int = 0
-    last_probability: Optional[float] = None
+# ---- Rate limit (per IP, in memory) ----
+hits = defaultdict(deque)
+def limited(ip):
+    now, d = time.time(), hits[ip]
+    while d and now - d[0] > 60:
+        d.popleft()
+    if len(d) >= RATE:
+        return True
+    d.append(now)
+    return False
 
+# ---- Telegram ----
+async def telegram(a: AlertIn, when: str) -> str:
+    if not (TOKEN and CHAT):
+        print("[alert] Telegram disabled, alert stored only:", a.vehicle_label, a.event.peak_g, "g")
+        return "disabled"
+    ev, loc = a.event, a.location
+    if loc:
+        acc = f" (accuracy {round(loc.accuracy_m)} m)" if loc.accuracy_m is not None else ""
+        where = f"https://www.google.com/maps?q={loc.lat},{loc.lng}{acc}"
+    else:
+        where = "unavailable"
+    text = (f"{'TEST ' if ev.flags & 2 else ''}CRASH ALERT (severity {ev.severity}: {SEV[ev.severity]})\n"
+            f"Vehicle: {a.vehicle_label}\nPeak impact: {ev.peak_g:.1f} g, confidence {round(ev.confidence * 100)}%\n"
+            f"Time: {when}\nLocation: {where}")
+    base = f"https://api.telegram.org/bot{TOKEN}"
+    try:
+        async with httpx.AsyncClient(timeout=5) as h:
+            (await h.post(f"{base}/sendMessage", json={"chat_id": CHAT, "text": text})).raise_for_status()
+            if loc:
+                await h.post(f"{base}/sendLocation", json={"chat_id": CHAT, "latitude": loc.lat, "longitude": loc.lng})
+        return "sent"
+    except Exception as e:
+        print("[alert] Telegram failed:", type(e).__name__)  # never print the URL: it holds the token
+        return "failed"
 
-def alert_dict(row):
-    data = dict(row)
-    age = time.time() - data["created_at"]
-    if data["status"] == "pending" and age > CANCEL_SECONDS:
-        data["status"] = "dispatched"  # cancel window passed, no human action needed
-    data["cancel_seconds_left"] = max(0, round(CANCEL_SECONDS - age)) if data["status"] == "pending" else 0
-    return data
-
-
-def device_dict(row):
-    data = dict(row)
-    data["connected"] = bool(data["connected"])
-    data["seconds_since_seen"] = round(time.time() - data["last_seen"])
-    data["online"] = data["connected"] and data["seconds_since_seen"] < ONLINE_SECONDS
-    return data
-
-
-def load_alert(conn, alert_id):
-    row = conn.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Unknown alert")
-    return alert_dict(row)
-
-
-def change_status(alert_id, new_status, allowed):
-    with closing(connect()) as conn, conn:
-        current = load_alert(conn, alert_id)["status"]
-        if current not in allowed:
-            raise HTTPException(status_code=409, detail=f"Alert is already {current}")
-        conn.execute("UPDATE alerts SET status = ? WHERE id = ?", (new_status, alert_id))
-        return load_alert(conn, alert_id)
-
-
-@app.get("/", include_in_schema=False)
-def root():
-    return RedirectResponse("/docs")
-
+# ---- App ----
+app = FastAPI(title="CrashGuard")
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "time": time.time()}
+    return {"status": "ok"}
 
+@app.get("/")
+def client_page():
+    return FileResponse(STATIC / "index.html")
 
-@app.put("/api/devices/{device_id}/heartbeat", dependencies=[Depends(require_key)])
-def heartbeat(device_id: str, body: HeartbeatIn):
-    with closing(connect()) as conn, conn:
-        conn.execute(
-            """INSERT INTO devices (device_id, last_seen, connected, rssi, alert_count, last_probability)
-               VALUES (?, ?, ?, ?, ?, ?)
-               ON CONFLICT(device_id) DO UPDATE SET last_seen = excluded.last_seen,
-               connected = excluded.connected, rssi = excluded.rssi,
-               alert_count = excluded.alert_count, last_probability = excluded.last_probability""",
-            (device_id, time.time(), int(body.connected), body.rssi, body.alert_count,
-             body.last_probability))
-        row = conn.execute("SELECT * FROM devices WHERE device_id = ?", (device_id,)).fetchone()
-    return device_dict(row)
+@app.get("/dispatch")
+def dispatch_page():
+    return FileResponse(STATIC / "dispatch.html")
 
+@app.post("/api/alerts", status_code=201)
+async def post_alert(a: AlertIn, request: Request):
+    if limited(request.client.host if request.client else "?"):
+        raise HTTPException(429, "Too many alerts")
+    now = datetime.now(timezone.utc)
+    ev, loc = a.event, a.location
+    id_ = q("""INSERT INTO alerts(created_at_utc,vehicle_label,event_class,severity,peak_g,confidence,flags,device_ms,seq,
+        lat,lng,accuracy_m,fix_age_s,client_time_iso,countdown_s,telegram_status,status)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (now.isoformat(), a.vehicle_label, ev.cls, ev.severity, ev.peak_g, ev.confidence, ev.flags, ev.device_ms, ev.seq,
+         loc.lat if loc else None, loc.lng if loc else None, loc.accuracy_m if loc else None,
+         loc.fix_age_s if loc else None, a.client_time_iso, a.countdown_s, "pending", "received"), write=True)
+    when = f"{now.astimezone(TZ).strftime('%d %b %Y, %H:%M')} ({TZ.key.split('/')[-1]})"
+    status = await telegram(a, when)
+    q("UPDATE alerts SET telegram_status=? WHERE id=?", (status, id_), write=True)
+    return {"id": id_, "status": "received", "telegram_status": status}
 
-@app.get("/api/devices", dependencies=[Depends(require_key)])
-def list_devices():
-    with closing(connect()) as conn:
-        rows = conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
-    return [device_dict(r) for r in rows]
+@app.post("/api/events", status_code=201)
+def post_event(e: EventLogIn):
+    ev = e.event
+    q("""INSERT INTO events(created_at_utc,type,vehicle_label,event_class,severity,peak_g,flags,client_time_iso)
+        VALUES(?,?,?,?,?,?,?,?)""",
+      (datetime.now(timezone.utc).isoformat(), e.type, e.vehicle_label, ev.cls, ev.severity, ev.peak_g, ev.flags,
+       e.client_time_iso), write=True)
+    return {"status": "stored"}
 
+def with_local(rows):
+    for r in rows:
+        r["created_at_local"] = datetime.fromisoformat(r["created_at_utc"]).astimezone(TZ).strftime("%d %b %H:%M:%S")
+    return rows
 
-@app.get("/api/devices/{device_id}/status", dependencies=[Depends(require_key)])
-def device_status(device_id: str):
-    with closing(connect()) as conn:
-        row = conn.execute("SELECT * FROM devices WHERE device_id = ?", (device_id,)).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Unknown device")
-    return device_dict(row)
+@app.get("/api/alerts")
+def list_alerts(limit: int = 50):
+    return with_local(q("SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (min(max(limit, 1), 500),)))
 
-
-@app.post("/api/alerts", status_code=201, dependencies=[Depends(require_key)])
-def create_alert(body: AlertIn):
-    alert_id, now = uuid.uuid4().hex[:12], time.time()
-    with closing(connect()) as conn, conn:
-        conn.execute(
-            """INSERT INTO alerts (id, device_id, probability, latitude, longitude,
-               occurred_at, created_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')""",
-            (alert_id, body.device_id, body.probability, body.latitude, body.longitude,
-             body.occurred_at or now, now))
-        return load_alert(conn, alert_id)
-
-
-@app.get("/api/alerts", dependencies=[Depends(require_key)])
-def list_alerts(status: Optional[str] = None, device_id: Optional[str] = None,
-                limit: int = Query(50, ge=1, le=200)):
-    with closing(connect()) as conn:
-        rows = conn.execute("SELECT * FROM alerts ORDER BY created_at DESC LIMIT 500").fetchall()
-    alerts = [alert_dict(r) for r in rows]
-    if status:
-        alerts = [a for a in alerts if a["status"] == status]
-    if device_id:
-        alerts = [a for a in alerts if a["device_id"] == device_id]
-    return alerts[:limit]
-
-
-@app.get("/api/alerts/{alert_id}", dependencies=[Depends(require_key)])
-def get_alert(alert_id: str):
-    with closing(connect()) as conn:
-        return load_alert(conn, alert_id)
-
-
-@app.post("/api/alerts/{alert_id}/cancel", dependencies=[Depends(require_key)])
-def cancel_alert(alert_id: str):
-    return change_status(alert_id, "cancelled", ("pending",))
-
-
-@app.post("/api/alerts/{alert_id}/resolve", dependencies=[Depends(require_key)])
-def resolve_alert(alert_id: str):
-    return change_status(alert_id, "resolved", ("pending", "dispatched"))
+@app.get("/api/events")
+def list_events(limit: int = 50):
+    return with_local(q("SELECT * FROM events ORDER BY id DESC LIMIT ?", (min(max(limit, 1), 500),)))
