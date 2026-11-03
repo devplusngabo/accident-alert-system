@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="250" viewBox="0 0 1200 250" role="img" aria-label="How it works: the sensor detects an impact, the phone counts down and adds GPS, the server stores and notifies, responders act">
+  <style>
+    .t { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .box { fill: #1a1a19; stroke: rgba(255,255,255,.12); stroke-width: 1.5; }
+    .ico { fill: none; stroke: #f0efec; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .line { stroke: #383835; stroke-width: 2; stroke-dasharray: 6 6; }
+    .dot { fill: #e8763f; }
+    .step { opacity: .35; animation: lit 6s infinite; }
+    .s2 { animation-delay: 1.5s; } .s3 { animation-delay: 3s; } .s4 { animation-delay: 4.5s; }
+    @keyframes lit { 0%, 30% { opacity: 1; } 40%, 100% { opacity: .35; } }
+    @media (prefers-reduced-motion: reduce) { .step { animation: none; opacity: 1; } .dot { display: none; } }
+  </style>
+  <rect width="1200" height="250" rx="20" fill="#0d0d0d"/>
+
+  <!-- connectors with travelling packets -->
+  <line class="line" x1="250" y1="105" x2="350" y2="105"/>
+  <line class="line" x1="550" y1="105" x2="650" y2="105"/>
+  <line class="line" x1="850" y1="105" x2="950" y2="105"/>
+  <circle class="dot" r="6" cy="105"><animate attributeName="cx" values="250;350" dur="1.5s" begin="0s;p3.end+1.5s" id="p1" fill="freeze"/><animate attributeName="opacity" values="1;1;0" dur="1.5s" begin="0s;p3.end+1.5s" fill="freeze"/></circle>
+  <circle class="dot" r="6" cy="105" opacity="0"><animate attributeName="cx" values="550;650" dur="1.5s" begin="p1.end" id="p2" fill="freeze"/><animate attributeName="opacity" values="1;1;0" dur="1.5s" begin="p1.end" fill="freeze"/></circle>
+  <circle class="dot" r="6" cy="105" opacity="0"><animate attributeName="cx" values="850;950" dur="1.5s" begin="p2.end" id="p3" fill="freeze"/><animate attributeName="opacity" values="1;1;0" dur="1.5s" begin="p2.end" fill="freeze"/></circle>
+
+  <g class="t">
+    <!-- 1 sensor -->
+    <g class="step">
+      <rect class="box" x="50" y="40" width="200" height="130" rx="16"/>
+      <g class="ico" transform="translate(130 58)"><rect x="2" y="4" width="36" height="28" rx="4"/><path d="M10 4V0M20 4V0M30 4V0M10 32v4M20 32v4M30 32v4"/><path d="M12 22l5-8 5 6 6-10" stroke="#e8763f"/></g>
+      <text x="150" y="122" fill="#f0efec" font-size="17" font-weight="700" text-anchor="middle">Sensor in vehicle</text>
+      <text x="150" y="146" fill="#898781" font-size="13" text-anchor="middle">Arduino Nano 33 BLE</text>
+    </g>
+    <!-- 2 phone -->
+    <g class="step s2">
+      <rect class="box" x="350" y="40" width="200" height="130" rx="16"/>
+      <g class="ico" transform="translate(436 54)"><rect x="0" y="0" width="28" height="44" rx="5"/><path d="M11 38h6"/><circle cx="14" cy="18" r="7" stroke="#e8763f"/></g>
+      <text x="450" y="122" fill="#f0efec" font-size="17" font-weight="700" text-anchor="middle">Driver's phone</text>
+      <text x="450" y="146" fill="#898781" font-size="13" text-anchor="middle">Countdown + GPS</text>
+    </g>
+    <!-- 3 server -->
+    <g class="step s3">
+      <rect class="box" x="650" y="40" width="200" height="130" rx="16"/>
+      <g class="ico" transform="translate(730 58)"><rect x="0" y="0" width="40" height="14" rx="3"/><rect x="0" y="20" width="40" height="14" rx="3"/><path d="M8 7h.01M8 27h.01" stroke="#e8763f" stroke-width="4"/></g>
+      <text x="750" y="122" fill="#f0efec" font-size="17" font-weight="700" text-anchor="middle">Cloud API</text>
+      <text x="750" y="146" fill="#898781" font-size="13" text-anchor="middle">FastAPI + Telegram</text>
+    </g>
+    <!-- 4 responders -->
+    <g class="step s4">
+      <rect class="box" x="950" y="40" width="200" height="130" rx="16"/>
+      <g class="ico" transform="translate(1028 56)"><path d="M22 2l16 6v11c0 9-7 16-16 19C13 35 6 28 6 19V8z"/><path d="M15 20l5 5 9-9" stroke="#e8763f"/></g>
+      <text x="1050" y="122" fill="#f0efec" font-size="17" font-weight="700" text-anchor="middle">Responders</text>
+      <text x="1050" y="146" fill="#898781" font-size="13" text-anchor="middle">Stations take action</text>
+    </g>
+    <text x="300" y="210" fill="#c3c2b7" font-size="13" text-anchor="middle">impact ≥ 3.5 g → Bluetooth</text>
+    <text x="600" y="210" fill="#c3c2b7" font-size="13" text-anchor="middle">not cancelled → HTTPS</text>
+    <text x="900" y="210" fill="#c3c2b7" font-size="13" text-anchor="middle">alarm on every station</text>
+  </g>
+</svg>
