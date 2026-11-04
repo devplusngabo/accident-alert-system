@@ -1,4 +1,4 @@
-import hashlib, hmac, math, os, secrets, sqlite3, statistics, time
+import asyncio, hashlib, hmac, json, math, os, secrets, sqlite3, statistics, time
 from collections import Counter, defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,8 +20,12 @@ TZ = ZoneInfo(os.getenv("TIMEZONE_DISPLAY", "Africa/Kigali"))
 RATE = int(os.getenv("ALERT_RATE_LIMIT_PER_MIN", "10"))
 LOGIN_RATE = int(os.getenv("LOGIN_ATTEMPTS_PER_MIN", "5"))
 SESSION_HOURS = float(os.getenv("SESSION_HOURS", "12"))
-DEMO_PIN = os.getenv("DEMO_STATION_PIN", "")
+DEMO_PIN = os.getenv("DEMO_STATION_PIN", "2468")
 STATIC = Path(__file__).parent / "static"
+# Dispatch stations, one per Kigali district (name, lat, lng of the district office area)
+KIGALI_DISTRICTS = [("Gasabo District", -1.9441, 30.0880),
+                    ("Kicukiro District", -1.9706, 30.1044),
+                    ("Nyarugenge District", -1.9787, 30.0435)]
 SEV = {0: "none", 1: "minor", 2: "serious", 3: "critical"}
 
 # Incident workflow. Order matters: an assigned station may only move an incident forward.
@@ -81,12 +85,14 @@ def init_db():
             if col not in have:
                 c.execute(f"ALTER TABLE alerts ADD COLUMN {col} {typ}")
         c.execute("UPDATE alerts SET status='new' WHERE status IS NULL OR status='received'")
+        # Older databases used neighbourhood names; dispatch is organised by Kigali district
+        for old, new in [("Kacyiru Station", "Gasabo District"), ("Nyamirambo Station", "Nyarugenge District"),
+                         ("Kicukiro Station", "Kicukiro District")]:
+            c.execute("UPDATE stations SET name=?, area='Kigali City' WHERE name=?", (new, old))
         if DEMO_PIN and not c.execute("SELECT 1 FROM stations LIMIT 1").fetchone():
-            for name, area, lat, lng in [("Kacyiru Station", "Gasabo", -1.9441, 30.0880),
-                                         ("Nyamirambo Station", "Nyarugenge", -1.9787, 30.0435),
-                                         ("Kicukiro Station", "Kicukiro", -1.9706, 30.1044)]:
-                add_station(c, name, area, lat, lng, DEMO_PIN)
-            print("[stations] Seeded 3 demo stations with DEMO_STATION_PIN. Change the PINs before real use.")
+            for name, lat, lng in KIGALI_DISTRICTS:
+                add_station(c, name, "Kigali City", lat, lng, DEMO_PIN)
+            print(f"[stations] Seeded the {len(KIGALI_DISTRICTS)} Kigali districts with DEMO_STATION_PIN. Change the PINs before real use.")
 
 
 # ---- PINs and sessions ----
@@ -385,6 +391,33 @@ def update_alert(alert_id: int, body: UpdateIn, station=Depends(current_station)
                    (body.note or "").strip() or None, now))
         c.execute("UPDATE alerts SET updated_at_utc=? WHERE id=?", (now, alert_id))
     return alert_detail(alert_id)
+
+
+def change_signature():
+    r = q("SELECT (SELECT MAX(id) FROM alerts) a, (SELECT MAX(updated_at_utc) FROM alerts) u, (SELECT MAX(id) FROM alert_updates) x")[0]
+    return [r["a"], r["u"], r["x"]]
+
+
+@app.get("/api/stream")
+async def stream(request: Request, _=Depends(current_station)):
+    """Server-sent events: one message whenever an alert is created or updated, so the portal reacts in about a second.
+    Read with fetch() (not EventSource) so the session token stays in the Authorization header, not the URL."""
+    async def gen():
+        last, idle = None, 0
+        yield "retry: 3000\n\n"
+        while not await request.is_disconnected():
+            sig = await asyncio.to_thread(change_signature)
+            if sig != last:
+                last, idle = sig, 0
+                yield f"data: {json.dumps({'latest_id': sig[0]})}\n\n"
+            else:
+                idle += 1
+                if idle >= 15:  # keep-alive so proxies and the browser don't drop a quiet connection
+                    idle = 0
+                    yield ": ping\n\n"
+            await asyncio.sleep(1)
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/api/events")
