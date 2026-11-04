@@ -109,7 +109,8 @@ sequenceDiagram
 
 ### 🚑 Responder portal
 - **Station sign-in** with a PIN
-- **Live incident queue**: critical and unassigned incidents first
+- **Instant alerts**: pop-up, alarm sound and desktop notification within about a second
+- **Live incident queue**: incidents waiting for a station first, then those in progress
 - **Status workflow**: Unassigned → Acknowledged → En route → On scene → Resolved / False alarm
 - **One station leads**, others can **send support** and add notes
 - **Timeline** of every action, **nearest stations** by distance
@@ -279,17 +280,49 @@ DB_PATH=./demo.db DEMO_STATION_PIN=2468 python scripts/seed_demo_data.py
 DB_PATH=./demo.db DEMO_STATION_PIN=2468 uvicorn app.main:app --port 8000
 ```
 
-Open **http://localhost:8000/dispatch**, pick a station and enter PIN **2468**. Then open **http://localhost:8000/** and tap **Simulate crash (no device)**.
+Open **http://localhost:8000/dispatch**, pick a Kigali district (Gasabo, Kicukiro or Nyarugenge) and enter PIN **2468**. Then open **http://localhost:8000/** and tap **Simulate crash (no device)**.
 
-### 3. Make it HTTPS for the phone
+### 3. Use a real phone, all on localhost (no tunnel)
 
-Web Bluetooth, GPS and wake lock only work over HTTPS. For a demo, a free tunnel is enough:
+Web Bluetooth, GPS and wake lock only work on a secure page. Chrome counts **`http://localhost`** as secure, so the easiest way is to make the phone's `localhost` point at your computer over USB:
+
+```bash
+cd backend
+python scripts/phone_local.py          # runs `adb reverse tcp:8000 tcp:8000` and checks everything
+```
+
+Then on the phone, in Chrome, open **http://localhost:8000/** (driver app) and on the computer **http://localhost:8000/dispatch** (portal). No internet, certificate or Chrome setting needed, and it works from WSL as is.
+
+<details>
+<summary><b>First time with USB debugging</b></summary>
+
+1. Phone: **Settings › About phone**, tap **Build number** 7 times.
+2. **Developer options › USB debugging** on.
+3. Plug in the cable and tap **Allow** on the phone.
+4. Needs Android `platform-tools` (`adb`) on the computer. Run the script again after re-plugging.
+
+</details>
+
+<details>
+<summary><b>Without a cable: same Wi-Fi or the phone's hotspot</b></summary>
+
+Connect the computer to the same Wi-Fi, or to the phone's hotspot, and start the server with `--host 0.0.0.0`. `phone_local.py` prints the address to open, e.g. `http://192.168.1.20:8000/`.
+
+- The **portal** works as is.
+- For the **driver app**, Chrome blocks Bluetooth and GPS on a plain `http://` IP address. On the phone open `chrome://flags/#unsafely-treat-insecure-origin-as-secure`, add `http://192.168.1.20:8000`, choose **Enabled** and **Relaunch**. The app shows a warning when this is missing.
+- Allow the port through the computer's firewall.
+- **WSL:** the phone can't reach WSL directly. Add `[wsl2]` / `networkingMode=mirrored` to `%UserProfile%\.wslconfig` and run `wsl --shutdown`, or use USB.
+
+</details>
+
+<details>
+<summary><b>Over the internet (tunnel)</b></summary>
 
 ```bash
 cloudflared tunnel --url http://localhost:8000       # or: ngrok http 8000
 ```
 
-Open the `https://…` link on an Android phone in Chrome for the driver app (`/`), and on any computer for the portal (`/dispatch`).
+</details>
 
 ### 4. Flash the sensor
 
@@ -307,7 +340,7 @@ Chrome up to date · Bluetooth on · Location on and allowed · Battery saver of
 
 ```bash
 cd backend
-python scripts/manage_stations.py add "Kacyiru Station" --area Gasabo --lat -1.9441 --lng 30.0880
+python scripts/manage_stations.py add "Gasabo District" --area "Kigali City" --lat -1.9441 --lng 30.0880
 python scripts/manage_stations.py list
 python scripts/manage_stations.py set-pin 2
 python scripts/manage_stations.py remove 2
@@ -338,7 +371,7 @@ Without them, alerts are still stored and shown in the portal.
 | `TIMEZONE_DISPLAY` | `Africa/Kigali` | Time zone for times and analytics |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | empty | Telegram notifications |
 | `ALERT_RATE_LIMIT_PER_MIN` | `10` | Alerts per IP per minute |
-| `DEMO_STATION_PIN` | empty | Creates 3 demo stations on an empty database |
+| `DEMO_STATION_PIN` | `2468` | Creates the 3 Kigali district stations (Gasabo, Kicukiro, Nyarugenge) on an empty database |
 | `SESSION_HOURS` | `12` | How long a station stays signed in |
 | `LOGIN_ATTEMPTS_PER_MIN` | `5` | Sign-in attempts per IP per minute |
 
@@ -354,6 +387,7 @@ Without them, alerts are still stored and shown in the portal.
 | `POST` | `/api/events` | rate limited | Phone logs a cancelled or ignored event |
 | `GET` | `/api/stations` | public | Station list for sign-in |
 | `POST` | `/api/auth/login` · `/logout` | – | Station session |
+| `GET` | `/api/stream` | station | Live update stream (server-sent events) |
 | `GET` | `/api/alerts?scope=active` | station | Incident list |
 | `GET` | `/api/alerts/{id}` | station | Incident with timeline |
 | `POST` | `/api/alerts/{id}/updates` | station | Change status, send support, add a note |
@@ -372,7 +406,7 @@ accident-alert-system/
 │   ├── app/
 │   │   ├── main.py                 # API, workflow, analytics
 │   │   └── static/                 # phone app + responder portal
-│   └── scripts/                    # stations, demo data, test alert
+│   └── scripts/                    # stations, demo data, test alert, phone on localhost
 ├── firmware/
 │   ├── crashguard_firmware/        # threshold detector + BLE protocol (used by the phone)
 │   └── crash_detector/             # on-device neural network
@@ -390,7 +424,7 @@ accident-alert-system/
 - [x] Phone app with countdown, GPS and retries
 - [x] Responder portal with station workflow and analytics
 - [x] Google Maps with route from the station
-- [ ] Instant push to the portal (Server-Sent Events) instead of polling
+- [x] Instant push to the portal (Server-Sent Events) instead of polling
 - [ ] Connect the on-device AI model to the phone flow
 - [ ] Always-on cloud deployment
 - [x] Accuracy evaluation on VZCrash and our own recordings
