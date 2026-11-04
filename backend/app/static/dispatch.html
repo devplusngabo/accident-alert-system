@@ -13,9 +13,9 @@
 <section id="login" class="login" hidden>
   <form id="loginForm" class="login-card" autocomplete="off">
     <div class="brand brand-lg"><svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/><path d="M12 8.5v4M12 15.5v.01"/></svg><span>AccidentAlert AI<small>Response Portal</small></span></div>
-    <h1>Station sign in</h1>
-    <p class="muted">Sign in with your station to receive crash alerts and update incidents.</p>
-    <label for="stationSel">Station</label>
+    <h1>District sign in</h1>
+    <p class="muted">Sign in with your Kigali district to receive crash alerts and update incidents.</p>
+    <label for="stationSel">District</label>
     <select id="stationSel" required></select>
     <label for="pin">PIN</label>
     <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" required>
@@ -30,138 +30,184 @@
   <header class="topbar">
     <div class="brand"><svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/><path d="M12 8.5v4M12 15.5v.01"/></svg><span>AccidentAlert AI<small>Response Portal</small></span></div>
     <nav class="tabs" role="tablist">
-      <button role="tab" data-view="live" aria-selected="true">Live incidents <b id="tabCount" class="count" hidden></b></button>
+      <button role="tab" data-view="live" aria-selected="true">Incidents <b id="tabCount" class="count" hidden></b></button>
       <button role="tab" data-view="analytics" aria-selected="false">Analytics</button>
     </nav>
     <div class="top-right">
-      <span id="live" class="live"><i></i><span id="liveTxt">Connecting</span></span>
-      <span id="clock" class="clock"></span>
-      <button id="snd" class="btn ghost sm" title="Play a sound when a new alert arrives">Sound off</button>
-      <div class="me"><span class="me-dot"></span><span><b id="meName"></b><small id="meArea"></small></span></div>
-      <button id="logout" class="btn ghost sm">Sign out</button>
+      <span id="live" class="live off" title="Connection to the server"><i></i><span id="liveTxt">Connecting</span></span>
+      <button id="alertsBtn" class="btn ghost sm bell" title="Sound and desktop notifications for new crash alerts">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M3 3l18 18"/></svg>
+        <span id="alertsTxt">Alerts on</span>
+      </button>
+      <div class="me"><span class="me-dot" aria-hidden="true"></span><span><b id="meName"></b><small id="meArea"></small></span>
+        <button id="logout" class="btn ghost sm">Sign out</button></div>
     </div>
   </header>
-  <div id="banner" class="banner" role="alert" hidden></div>
+  <div id="soundHint" class="hint" hidden>Click anywhere to turn on the alarm sound for new crash alerts.</div>
 
   <!-- Live view -->
   <section id="view-live" class="view live-view">
-    <div class="stats">
-      <div class="stat"><small>Unassigned</small><b id="sNew">0</b><span>waiting for a station</span></div>
-      <div class="stat"><small>In progress</small><b id="sProg">0</b><span>acknowledged, en route or on scene</span></div>
-      <div class="stat"><small>My station</small><b id="sMine">0</b><span>active incidents you lead</span></div>
-      <div class="stat"><small>Closed today</small><b id="sClosed">0</b><span>resolved or false alarm</span></div>
-    </div>
-    <div class="split">
-      <aside class="queue">
-        <div class="filters" role="group" aria-label="Filter incidents">
-          <button data-f="active" class="on">Active</button><button data-f="mine">Mine</button><button data-f="closed">Closed</button><button data-f="all">All</button>
+    <aside class="queue">
+      <div class="filters" role="group" aria-label="Filter incidents">
+        <button data-f="active" class="on">Active <b id="cActive"></b></button>
+        <button data-f="mine">Mine <b id="cMine"></b></button>
+        <button data-f="closed">Closed</button>
+      </div>
+      <input id="search" class="search" type="search" placeholder="Search vehicle plate" aria-label="Search vehicle">
+      <div id="list" class="list"></div>
+    </aside>
+
+    <article id="detail" class="detail">
+      <div id="empty" class="empty-state"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/><path d="m9 12 2 2 4-4"/></svg><h2>All clear</h2><p>New crash alerts will pop up here with a sound as soon as they arrive.</p></div>
+      <div id="info" hidden>
+        <div class="d-head">
+          <div class="d-title">
+            <div class="d-tags"><span id="dSev" class="sev"></span><span id="dStatus" class="pill"></span><span id="dTest" class="tag" hidden>Test</span></div>
+            <h2 id="dVeh"></h2>
+            <p id="dSub" class="muted"></p>
+          </div>
+          <div id="actions" class="actions"></div>
         </div>
-        <input id="search" class="search" type="search" placeholder="Search vehicle" aria-label="Search vehicle">
-        <div id="list" class="list"></div>
-      </aside>
-      <article id="detail" class="detail">
-        <div id="empty" class="empty-state"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9-4.1-1.3-7-4.8-7-9V6l7-3z"/><path d="m9 12 2 2 4-4"/></svg><h2>No incident selected</h2><p>New crash alerts appear in the queue as they arrive.</p></div>
-        <div id="info" hidden>
-          <div class="d-head">
-            <div>
-              <div class="d-tags"><span id="dSev" class="sev"></span><span id="dStatus" class="pill"></span><span id="dTest" class="tag" hidden>Test</span></div>
-              <h2 id="dVeh"></h2>
-              <p id="dSub" class="muted"></p>
+        <div id="progress" class="progress"></div>
+        <dl class="facts">
+          <div><dt>Impact</dt><dd id="mPeak"></dd></div>
+          <div><dt>Confidence</dt><dd id="mConf"></dd></div>
+          <div><dt>Received</dt><dd id="mTime"></dd></div>
+          <div><dt>GPS accuracy</dt><dd id="mAcc"></dd></div>
+          <div><dt>Response time</dt><dd id="mAck"></dd></div>
+        </dl>
+        <div class="d-grid">
+          <div class="card map-card">
+            <div class="card-h"><h3>Location</h3>
+              <div id="mapMode" class="seg seg-sm" role="group" aria-label="Map view"><button data-m="pin" class="on">Crash site</button><button data-m="route">Route from my station</button></div>
             </div>
-            <div id="actions" class="actions"></div>
+            <iframe id="map" title="Incident location on Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <p id="noLoc" class="muted pad" hidden>The phone had no recent GPS fix when the alert was sent.</p>
+            <div id="nearest" class="nearest" hidden>
+              <div class="near-h"><h3>Stations near the scene</h3><span class="muted">Drive times are estimates</span></div>
+              <div id="nearList" class="near-list"></div>
+            </div>
           </div>
-          <div class="metrics">
-            <div><small>Peak impact</small><b id="mPeak"></b></div>
-            <div><small>Confidence</small><b id="mConf"></b></div>
-            <div><small>Received</small><b id="mTime"></b></div>
-            <div><small>GPS accuracy</small><b id="mAcc"></b></div>
-            <div><small>Time to acknowledge</small><b id="mAck"></b></div>
-          </div>
-          <div class="d-grid">
-            <div class="card map-card">
-              <div class="card-h"><h3>Location</h3>
-                <div id="mapMode" class="seg seg-sm" role="group" aria-label="Map view"><button data-m="pin" class="on">Crash site</button><button data-m="route">Route from my station</button></div>
-              </div>
-              <iframe id="map" title="Incident location on Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-              <p id="noLoc" class="muted pad" hidden>The phone had no recent GPS fix when the alert was sent.</p>
-            </div>
-            <div class="side">
-              <div class="card">
-                <div class="card-h"><h3>Nearest stations</h3></div>
-                <ul id="nearest" class="nearest"></ul>
-              </div>
-              <div class="card">
-                <div class="card-h"><h3>Timeline</h3></div>
-                <ol id="timeline" class="timeline"></ol>
-                <form id="noteForm" class="note"><input id="note" maxlength="500" placeholder="Add a note for other stations" aria-label="Note"><button class="btn sm" type="submit">Add</button></form>
-              </div>
-            </div>
+          <div class="card side">
+            <div class="card-h"><h3>Activity</h3></div>
+            <ol id="timeline" class="timeline"></ol>
+            <form id="noteForm" class="note"><input id="note" maxlength="500" placeholder="Write a note for other stations" aria-label="Note"><button class="btn sm" type="submit">Send</button></form>
           </div>
         </div>
-      </article>
-    </div>
+      </div>
+    </article>
   </section>
 
   <!-- Analytics view -->
   <section id="view-analytics" class="view analytics" hidden>
     <div class="a-bar">
       <div>
-        <h2 id="aLabel">Analytics</h2>
-        <p class="muted">Crash alerts received, how fast they were handled and where they happen.</p>
+        <p class="eyebrow">Analytics</p>
+        <h2 id="aLabel">&nbsp;</h2>
       </div>
       <div class="a-controls">
         <div class="seg" role="group" aria-label="Period">
           <button data-p="year" class="on">Year</button><button data-p="month">Month</button><button data-p="day">Day</button>
         </div>
-        <button id="aPrev" class="btn ghost sm icon" aria-label="Previous period">&#8249;</button>
-        <select id="aYear" aria-label="Year"></select>
-        <input id="aMonth" type="month" aria-label="Month">
-        <input id="aDay" type="date" aria-label="Day">
-        <button id="aNext" class="btn ghost sm icon" aria-label="Next period">&#8250;</button>
+        <div class="stepper-ctl">
+          <button id="aPrev" class="btn ghost sm icon" aria-label="Previous period">&#8249;</button>
+          <select id="aYear" aria-label="Year"></select>
+          <input id="aMonth" type="month" aria-label="Month">
+          <input id="aDay" type="date" aria-label="Day">
+          <button id="aNext" class="btn ghost sm icon" aria-label="Next period">&#8250;</button>
+        </div>
+        <button id="aNow" class="btn ghost sm">Current</button>
         <label class="check"><input id="aTests" type="checkbox" checked> Include test alerts</label>
       </div>
     </div>
 
-    <div class="kpi-row" id="kpis"></div>
+    <div id="aBody" class="a-body">
+      <div class="kpi-row" id="kpis"></div>
 
-    <div class="card">
-      <div class="card-h"><div><h3>Accidents over time</h3><p id="tsSub" class="muted"></p></div><div id="tsLegend" class="legend"></div></div>
-      <div id="tsChart" class="chart"></div>
-      <details class="tbl"><summary>View as table</summary><div id="tsTable"></div></details>
-    </div>
+      <div class="a-grid main">
+        <div class="card">
+          <div class="card-h"><div><h3>Accidents over time</h3><p id="tsSub" class="muted"></p></div><div id="tsLegend" class="legend"></div></div>
+          <div id="tsChart" class="chart"></div>
+          <details class="tbl"><summary>View as table</summary><div id="tsTable"></div></details>
+        </div>
+        <div class="card highlights">
+          <div class="card-h"><div><h3>What stands out</h3><p class="muted">Plain-language summary of this period</p></div></div>
+          <ul id="insights" class="insights"></ul>
+        </div>
+      </div>
 
-    <div class="a-grid">
-      <div class="card" id="hourCard">
-        <div class="card-h"><div><h3>Time of day</h3><p class="muted">Accidents by hour the alert was received</p></div></div>
-        <div id="hourChart" class="chart"></div>
+      <div class="a-grid two" id="patterns">
+        <div class="card">
+          <div class="card-h"><div><h3>Time of day</h3><p class="muted">When alerts come in. The busiest 2 hours are highlighted.</p></div></div>
+          <div id="hourChart" class="chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><div><h3>Day of week</h3><p class="muted">Accidents per weekday. The busiest day is highlighted.</p></div></div>
+          <div id="dowChart" class="chart"></div>
+        </div>
       </div>
-      <div class="card" id="dowCard">
-        <div class="card-h"><div><h3>Day of week</h3><p class="muted">Accidents per weekday</p></div></div>
-        <div id="dowChart"></div>
-      </div>
+
       <div class="card">
-        <div class="card-h"><div><h3>Key insights</h3><p class="muted">Generated from the selected period</p></div></div>
-        <ul id="insights" class="insights"></ul>
+        <div class="card-h"><div><h3>Hotspots</h3><p class="muted">Places with repeated crashes (about 1 km areas). Pick one to see it on the map.</p></div></div>
+        <div class="hot-wrap">
+          <div id="hotspots" class="hot-list"></div>
+          <iframe id="hotMap" class="hot-map" title="Selected hotspot on Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade" hidden></iframe>
+        </div>
       </div>
+
       <div class="card">
-        <div class="card-h"><div><h3>Incident outcomes</h3><p class="muted">Current status of incidents in this period</p></div></div>
-        <div id="outChart"></div>
+        <div class="card-h"><div><h3>Station performance</h3><p class="muted">Incidents each station led, resolved and supported</p></div></div>
+        <div id="stationTable" class="scroll-x"></div>
       </div>
-      <div class="card wide">
-        <div class="card-h"><div><h3>Station performance</h3><p class="muted">Incidents led and supported by each station</p></div></div>
-        <div id="stationTable"></div>
-      </div>
-      <div class="card">
-        <div class="card-h"><div><h3>Hotspots</h3><p class="muted">Locations with repeated crashes (about 1 km areas)</p></div></div>
-        <iframe id="hotMap" class="hot-map" title="Selected hotspot on Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade" hidden></iframe>
-        <div id="hotspots"></div>
-      </div>
-      <div class="card">
-        <div class="card-h"><div><h3>Vehicles with most alerts</h3><p class="muted">Can point to risky drivers or faulty devices</p></div></div>
-        <div id="vehicles"></div>
+
+      <div class="a-grid three">
+        <div class="card">
+          <div class="card-h"><div><h3>Outcomes</h3><p class="muted">Where incidents from this period stand now</p></div></div>
+          <div id="outChart"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><div><h3>Alert quality</h3><p class="muted">How often detections were not real crashes</p></div></div>
+          <div id="quality" class="quality"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><div><h3>Vehicles with most alerts</h3><p class="muted">Can point to risky drivers or faulty devices</p></div></div>
+          <div id="vehicles"></div>
+        </div>
       </div>
     </div>
   </section>
+</div>
+
+<!-- New alert pop-up -->
+<div id="incoming" class="incoming" role="alertdialog" aria-modal="true" aria-labelledby="inTitle" hidden>
+  <div class="in-card">
+    <div class="in-top"><span class="in-ring" aria-hidden="true"></span><span id="inTitle">New crash alert</span><span id="inMore" class="in-more"></span></div>
+    <div id="inSev" class="in-sev"></div>
+    <div id="inVeh" class="in-veh"></div>
+    <div id="inMeta" class="in-meta"></div>
+    <div id="inNear" class="near-list compact"></div>
+    <div class="in-btns">
+      <button id="inTake" class="btn primary big">Acknowledge and respond</button>
+      <button id="inView" class="btn big">View details</button>
+    </div>
+    <button id="inLater" class="in-later">Not now (keep it in the queue)</button>
+  </div>
+</div>
+
+<!-- Confirmation dialog (replaces the browser's confirm box) -->
+<div id="ask" class="incoming ask" role="alertdialog" aria-modal="true" aria-labelledby="askTitle" aria-describedby="askBody" hidden>
+  <div class="in-card ask-card">
+    <div id="askIcon" class="ask-icon" aria-hidden="true"></div>
+    <div id="askKicker" class="in-top"></div>
+    <h2 id="askTitle" class="ask-title"></h2>
+    <div id="askInc" class="ask-inc"></div>
+    <p id="askBody" class="ask-body"></p>
+    <textarea id="askNote" class="ask-note" rows="2" maxlength="500" placeholder="Closing note for other stations (optional)" aria-label="Closing note"></textarea>
+    <div class="in-btns">
+      <button id="askOk" class="btn big"></button>
+      <button id="askCancel" class="btn big ghost">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <div id="tip" class="tip" hidden></div>
